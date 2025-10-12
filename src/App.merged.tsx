@@ -1734,9 +1734,16 @@ export default function App() {
           title={headerTitle}
           onBack={page === 'home' ? undefined : () => setPage('home')}
           onClose={() => {
+            // 팝업으로 열린 경우 → 창 닫기
+            if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
+              try { window.open('', '_self'); } catch {}
+              window.close();
+              return;
+            }
+            // 임베드/단일 페이지로 열린 경우 → 기존 동작
             setNetworkOpen(false);
             setPage('home');
-          }}
+                  }}
           rightExtra={
             typeof page === 'object' && (page as any).name === 'model' ? (
               <button

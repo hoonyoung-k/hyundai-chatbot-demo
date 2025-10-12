@@ -1,7 +1,4 @@
 // src/logic/router.ts
-import vehicles from "../assets/vehicles.json";
-import centers from "../assets/centers.json";
-import faq from "../assets/faq.json";
 
 import { parseIntent } from "./intent";
 import { moderateInput, sanitizeOutput, COPY, cushionMsgs, withCushion } from "./safety";
@@ -10,6 +7,11 @@ import { recGood, recBad, recTotal } from "./metrics";
 import { guardOutput } from "./safety-guard";
 import { callLLM } from "./bridge";
 import { loadOverrides, keyQ } from './overrides';
+
+import vehicles from "../assets/vehicles.json";
+import centers from "../assets/centers.json";
+import faqEmbed from "../assets/faq.json";
+
 
 // -----------------------------------------------------------------------------
 // Types
@@ -73,11 +75,28 @@ export const OOD_THRESHOLD = Number(
 );
 
 let _faq: Faq[] | null = null;
+
 async function getFaq(): Promise<Faq[]> {
   if (_faq) return _faq;
-  _faq = (faq as unknown as Faq[]); // ✅ ../assets/faq.json import 사용
+  try {
+    const res = await fetch("/faq.json", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length) {
+        _faq = data as Faq[];
+        return _faq!;
+      }
+      console.warn("[RAG] /faq.json empty or invalid; using embedded");
+    } else {
+      console.warn("[RAG] /faq.json http", res.status, "— using embedded");
+    }
+  } catch (e) {
+    console.warn("[RAG] fetch /faq.json failed; using embedded", e);
+  }
+  _faq = (faqEmbed as unknown) as Faq[];
   return _faq!;
 }
+
 
 
 function norm(s?: string){
@@ -268,7 +287,7 @@ function makeFallbackReply(msgExtras: string[] = [], chips: string[] = []): BotR
 
 // 하이리스크(정책/결제/개인정보/제재/확률 등) 감지
 function isHighRisk(text: string): boolean {
-  return /(정책|결제|카드|청구|환불|환급|개인정보|수집|보관|파기|유출|제재|징계|벌점|처벌|페널티|확률|당첨|보상|배상|보험)/i.test(text);
+  return /(정책|개인정보|수집|보관|파기|유출|제재|징계|벌점|처벌|페널티|확률|당첨|보상|배상|보험)/i.test(text);
 }
 
 
@@ -345,7 +364,10 @@ function rewriteQuery(q: string) {
 }
 
 export async function retrieveFaq(query: string, { k = 4 } = {}) {
-  if (!DOCS.length) buildIndex(faq as Faq[]);
+  if (!DOCS.length) {
+    const faqs = await getFaq();
+    buildIndex(faqs);
+  }
   const q2 = rewriteQuery(query);
   const ranked = DOCS
     .map((d) => ({ d, s: bm25Score(q2, d) }))
@@ -447,7 +469,7 @@ Promise<BotReply> {
 
       // 결제/환불/정책/개인정보 키워드
       const OOD_POLICY =
-        /(환불|반품|교환|취소|결제|청구|영수증|현금영수증|세금계산서|환급|분쟁|클레임|약관|정책|규정|지침|privacy|policy|gdpr|ccpa|개인정보|보관기간|보유기간|파기|열람|정정|삭제|동의철회|동의\s*철회)/i;
+        /(분쟁|클레임|약관|정책|규정|지침|privacy|policy|gdpr|ccpa|개인정보|보관기간|보유기간|파기|열람|정정|삭제|동의철회|동의\s*철회)/i;
 
       if (OOD_POLICY.test(raw) || OOD_POLICY.test(squished)) {
         const msg =
