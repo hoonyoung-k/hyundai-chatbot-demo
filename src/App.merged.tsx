@@ -9,6 +9,7 @@ import type { BotReply } from './logic/router';
 
 import centers from './assets/centers.json';
 import { withCoordsFromUrl, getGeoOnce } from './logic/geo';
+import { initRag } from "./logic/bridge";   // ⬅ 상단 import 구역에 추가
 
 
 
@@ -1684,6 +1685,11 @@ export default function App() {
       window.removeEventListener('open-network', onOpenNetwork as EventListener); // ★ 추가
     };
   }, [networkOpen, faqOpen, modelOpen, setFaqOpen]);
+
+  // ✅ RAG 인덱스 초기화: 앱 진입 시점에 1회 실행
+  useEffect(() => {
+    initRag();
+  }, []);
 
   // ✅ 닫기 이벤트 (서비스센터/시승예약 오버레이 전용)
   useEffect(() => {
