@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/* ---- prototype-like skin ---- */
+:root {
+  --hyundai-navy: #0b1b2b;
+  --card-border: 1px solid rgb(226 232 240);
+}
+html, body, #root { height: 100%; }
+body {
+  font-family: "Pretendard", system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+  background: rgb(248 250 252);
+  color: rgb(15 23 42);
+}
+.hd-header { background: var(--hyundai-navy); color: #fff; }
+.hd-card { background:#fff; border:var(--card-border); border-radius:1rem; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.hd-btn { border-radius:.75rem; padding:.5rem .75rem; font-size:.875rem; border:1px solid rgb(203 213 225); background:#fff; }
+.hd-btn--primary { background:var(--hyundai-navy); color:#fff; border-color:transparent; }
+.hd-inputbar { background:rgba(255,255,255,.9); backdrop-filter:blur(6px); border-top:1px solid rgb(226 232 240); }
+/* chips */
+.hd-chip { border:1px solid rgb(203 213 225); background:#fff; border-radius:9999px; padding:.375rem .75rem; font-size:.875rem; }
+.hd-chip:hover { border-color:var(--hyundai-navy); color:var(--hyundai-navy); }
+/* card bits */
+.card-title{font-weight:600;color:rgb(15 23 42)}
+.card-sub{font-size:.875rem;color:rgb(100 116 139)}
+.price{font-weight:600;color:rgb(15 23 42)}
+.badge{font-size:.75rem;border-radius:9999px;padding:.125rem .5rem;color:#fff;background:#111827}
+.badge-amber{background:#f59e0b}
+
+/* 버튼이 꽉 차지 않고 텍스트 길이만큼만 */
+/* === sticky CTA width fix === */
+.sticky-cta-wrap { 
+  /* 말풍선 폭과 맞추고 싶으면 값 조절 (예: 560px/600px) */
+  max-width: 560px;
+}
+
+/* 버튼은 내용폭만 차지하도록 강제 */
+.sticky-cta-btn {
+  display: inline-flex !important;
+  width: max-content !important;  /* 내용만큼 */
+  max-width: 100% !important;     /* 줄바꿈 안전망 */
+  white-space: nowrap;            /* 한 줄 유지 */
+  align-self: flex-start;
+}
+
+/* 혹시 유틸/테마에서 w-full을 얹어도 이기도록 방어 */
+.sticky-cta-wrap .hd-btn { width: max-content !important; }
+
+div.pt-1.sticky-cta-wrap > button.hd-btn.hd-btn--primary.sticky-cta-btn {
+  width: max-content !important;
+}
+
+/* sticky CTA 버튼이 w-full이어도 강제로 내용폭 */
+button.hd-btn.hd-btn--primary.w-full {
+  width: max-content !important;
+  display: inline-flex !important;
+}
+
+
+/* 최종 우선순위: sticky CTA 버튼 중간 사이즈 고정 */
+div.pt-1 > button.hd-btn.hd-btn--primary {
+  display: inline-flex !important;
+  width: fit-content !important;
+  min-width: 200px !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  justify-content: center !important;
+}
+
+
+@layer utilities {
+  /* 가로 스크롤바 슬림 스타일 */
+  .thin-scrollbar::-webkit-scrollbar { height: 6px; }
+  .thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .thin-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(100,116,139,.35); /* slate-500 ~ */
+    border-radius: 9999px;
+  }
+  .thin-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: rgba(100,116,139,.55);
+  }
+  /* Firefox */
+  .thin-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(100,116,139,.55) transparent; }
+
+  /* iOS 모멘텀 스크롤(가로 스크롤 부드럽게) */
+  .ios-momentum { -webkit-overflow-scrolling: touch; }
+}
