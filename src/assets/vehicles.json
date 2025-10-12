@@ -1,0 +1,6 @@
+[
+  { "id": "ioniq5", "name": "아이오닉 5", "fuel": "EV", "price_from": 52000000, "range_km": 458, "segment": "SUV", "tags": ["인기", "신형"] },
+  { "id": "santafe_hev", "name": "싼타페 하이브리드", "fuel": "HEV", "price_from": 37740000, "mpg": 30.6, "segment": "SUV", "tags": ["인기"] },
+  { "id": "palisade", "name": "팰리세이드", "fuel": "ICE", "price_from": 40160000, "segment": "SUV" },
+  { "id": "avante", "name": "아반떼", "fuel": "ICE", "price_from": 21000000, "segment": "Sedan", "tags": ["인기", "혜택"] }
+]
