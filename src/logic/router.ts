@@ -13,6 +13,7 @@ import centers from "../assets/centers.json";
 import faqEmbed from "../assets/faq.json";
 
 
+
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
@@ -320,6 +321,20 @@ function tok(s: string) {
 let DOCS: Doc[] = [];
 let IDF = new Map<string, number>();
 let AVG_LEN = 1;
+
+// 🔥 앱 로드 시 임베드 데이터로 인덱스를 즉시 생성
+try {
+  const _pre = (faqEmbed as any[]) || [];
+  if (!DOCS.length && Array.isArray(_pre) && _pre.length) {
+    buildIndex(_pre as Faq[]);
+    if ((import.meta as any)?.env?.DEV) {
+      console.log("[RAG] prebuilt from embed:", _pre.length);
+    }
+  }
+} catch (e) {
+  console.warn("[RAG] prebuild failed", e);
+}
+
 
 function buildIndex(faqs: Faq[]) {
   DOCS = (faqs || []).map((it) => {
