@@ -366,6 +366,34 @@ function bm25Score(query: string, d: Doc) {
   }
   return s;
 }
+// --- RAG index bootstrap (프로덕션 초기 로딩 경쟁 조건 방지) ---
+const FAQ_URL = '/faq.json'; // 프로덕션 절대경로 고정
+
+let __ragInit__: Promise<void> | null = null;
+
+async function getFaqHard(): Promise<any[]> {
+  // public/faq.json 을 동일출처로 fetch
+  const r = await fetch(FAQ_URL, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`FAQ fetch failed: ${r.status}`);
+  const json = await r.json();
+  // 배열 형태만 보장 (schema 느슨하게 방어)
+  return Array.isArray(json) ? json : (json?.items ?? []);
+}
+
+function ensureRagReady(buildIndex: (docs: any[]) => void) {
+  if (!__ragInit__) {
+    __ragInit__ = (async () => {
+      const docs = await getFaqHard();
+      buildIndex(docs); // ← 기존에 쓰던 인덱스 빌더를 그대로 호출
+      // 콘솔 확인용 (필요 시 주석 처리)
+      if ((import.meta as any).env?.DEV) {
+        console.log('[RAG] index built:', docs.length);
+      }
+    })();
+  }
+  return __ragInit__;
+}
+
 
 // 동의어/약어 리라이트(간단)
 function rewriteQuery(q: string) {
@@ -379,23 +407,23 @@ function rewriteQuery(q: string) {
 }
 
 export async function retrieveFaq(query: string, { k = 4 } = {}) {
-  if (!DOCS.length) {
-    const faqs = await getFaq();
-    buildIndex(faqs);
-  }
+  // ✅ 인덱스가 완전히 준비될 때까지 대기 (프로덕션 경쟁조건 해소)
+  await ensureRagReady(buildIndex);
+
   const q2 = rewriteQuery(query);
   const ranked = DOCS
     .map((d) => ({ d, s: bm25Score(q2, d) }))
-    .filter((x) => x.s > MIN_SCORE)
+    .filter((x) => x.s >= MIN_SCORE)                 // ← >= 로
     .sort((a, b) => b.s - a.s)
     .slice(0, k)
     .map(({ d, s }) => ({ id: d.id, text: d.text, url: d.url, score: s }));
 
-  if (import.meta && (import.meta as any).env?.DEV) {
-    console.log("[BM25] retr_total=", DOCS.length, "retr_k=", ranked.length, "q=", query, ranked);
+  if ((import.meta as any).env?.DEV) {
+    console.log('[BM25] retr_total=', DOCS.length, 'retr_k=', ranked.length, 'q=', query, ranked);
   }
   return ranked;
 }
+
 
 // dev-only: window.__bm25("질문", k)
 if (typeof window !== "undefined" && (import.meta as any)?.env?.DEV) {
