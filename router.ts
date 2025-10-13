@@ -383,15 +383,20 @@ async function getFaqHard(): Promise<any[]> {
 function ensureRagReady(buildIndex: (docs: any[]) => void) {
   if (!__ragInit__) {
     __ragInit__ = (async () => {
-      const docs = await getFaqHard();
-      buildIndex(docs); // ← 기존에 쓰던 인덱스 빌더를 그대로 호출
-      // 콘솔 확인용 (필요 시 주석 처리)
+      const raw = await getFaqHard();
+      const faqs = (raw || []).map((f: any, i: number) => ({
+        id: f?.id ?? String(i),
+        q: f?.q ?? f?.question ?? f?.title ?? "",
+        a: f?.a ?? f?.answer ?? f?.content ?? "",
+        url: f?.url ?? f?.link ?? ""
+      }));
+      buildIndex(faqs as any[]);
       if ((import.meta as any).env?.DEV) {
-        console.log('[RAG] index built:', docs.length);
+        console.log('[RAG] ensured & indexed from /faq.json:', faqs.length);
       }
     })();
   }
-  return __ragInit__;
+  return __ragInit__!;
 }
 
 
