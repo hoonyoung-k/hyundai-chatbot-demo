@@ -336,9 +336,20 @@ try {
 }
 
 
+
+// --- RAG alias variants (canonical -> variants added to doc text at index time) ---
+const VARIANTS_CANON: Record<string, string[]> = {
+  '아반떼': ['아반테', 'avante', 'elantra'],
+  '쏘나타': ['소나타', 'sonata'],
+  '그랜저': ['그랜져', 'grandeur'],
+};
 function buildIndex(faqs: Faq[]) {
   DOCS = (faqs || []).map((it) => {
-    const text = `${it.q}\n${it.a}`;
+    let text = `${it.q}\n${it.a}`;
+    // __ALIAS_EXPANSION__: if canonical exists, append variants to document text
+    for (const [canon, vars] of Object.entries(VARIANTS_CANON)) {
+      if (text.includes(canon)) text += ' ' + vars.join(' ');
+    }
     const toks = tok(text);
     const tf: Record<string, number> = {};
     for (const t of toks) tf[t] = (tf[t] || 0) + 1;
@@ -366,41 +377,6 @@ function logCorpusOnce(label: string) {
   console.log('[RAG] corpus', label, 'len=', (g.DOCS?.length ?? DOCS.length), 'sample=', sample);
 }
 
-
-
-// --- Canon/Variant helpers (typo & alias handling) ---
-const CANON_MAP: Record<string, string> = {
-  '아반테': '아반떼',
-  'avante': '아반떼',
-  'elantra': '아반떼',
-  '소나타': '쏘나타',
-  '그랜져': '그랜저',
-};
-
-function canonize(q: string): string {
-  let t = (q || '').toLowerCase();
-  t = t.replace(/([가-힣a-z])\s+([0-9]+)/gi, '$1$2'); // 아이오닉 5 -> 아이오닉5, ev 6 -> ev6
-  for (const [k, v] of Object.entries(CANON_MAP)) {
-    const re = new RegExp(k, 'gi');
-    t = t.replace(re, v);
-  }
-  return t;
-}
-
-function relaxKorean(s: string): string {
-  return (s || '').replace(/[ㄲ]/g,'ㄱ').replace(/[ㄸ]/g,'ㄷ').replace(/[ㅃ]/g,'ㅂ').replace(/[ㅆ]/g,'ㅅ').replace(/[ㅉ]/g,'ㅈ');
-}
-
-function buildQueryVariants(q: string): string[] {
-  const a = new Set<string>();
-  const base = (q || '').trim();
-  const c1 = canonize(base);
-  const c2 = relaxKorean(base);
-  const c3 = relaxKorean(c1);
-  const c4 = c1.replace(/\s+/g,'');
-  [base, c1, c2, c3, c4].forEach(x => { if (x) a.add(x); });
-  return Array.from(a);
-}
 function bm25Score(query: string, d: Doc) {
   const qToks = Array.from(new Set(tok(query)));
   let s = 0;
@@ -517,10 +493,15 @@ export async function retrieveFaq(query: string, { k = 4 } = {}) {
     if (retry.length) ranked = retry;
   }
 
-  // 폴백 2: 부분문자열 포함 (변이어/된소리 완화 포함)
+  // 폴백 2: 부분문자열 포함 (변이어 포함)
   if (!ranked.length) {
-    const cand = buildQueryVariants(query || '');
-    for (const qv of cand) {
+    const qRaw = (query || '').trim();
+    const variants = new Set<string>([qRaw]);
+    for (const [canon, vars] of Object.entries(VARIANTS_CANON)) {
+      if (qRaw.includes(canon)) vars.forEach(v => variants.add(qRaw.replace(canon, v)));
+      vars.forEach(v => { if (qRaw.includes(v)) variants.add(qRaw.replace(v, canon)); });
+    }
+    for (const qv of variants) {
       const hits = DOCS
         .filter((d) => d.text.includes(qv))
         .slice(0, k)

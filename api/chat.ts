@@ -1,7 +1,7 @@
 // /api/chat.ts — Vercel Edge Function proxy for OpenAI
 export const config = { runtime: 'edge' };
 
-// 환경변수 안전 접근 (Node typings 없이)
+// 환경변수 안전 접근
 function getEnv(name: string): string {
   const val =
     (globalThis as any)?.process?.env?.[name] ??
@@ -14,7 +14,7 @@ export default async function handler(req: Request): Promise<Response> {
   try {
     const body = await req.json();
     const {
-      model = 'gpt-4-turbo',       // 기본값 지정
+      model = 'gpt-4-turbo',   // 기본값 지정
       stream = false,
       messages = [],
       max_tokens = 400,
@@ -23,9 +23,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     const apiKey = getEnv('OPENAI_API_KEY');
     if (!apiKey) {
-      return new Response(JSON.stringify({
-        error: 'Missing OPENAI_API_KEY on server',
-      }), {
+      return new Response(JSON.stringify({ error: 'Missing OPENAI_API_KEY on server' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
       });
