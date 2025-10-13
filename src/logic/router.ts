@@ -405,8 +405,8 @@ function ensureRagReady(buildIndex: (docs: any[]) => void) {
       }));
       const docsB = (vehicles as any[]).map((v:any, i:number)=>({
         id: v?.id ?? `veh:${i}`,
-        q: v?.model ?? v?.name ?? v?.trim ?? '',
-        a: `${v?.segment ?? ''} ${v?.fuel ?? ''} ${v?.summary ?? ''}`.trim(),
+        q: v?.name ?? v?.model ?? v?.trim ?? '',
+        a: `${v?.name ?? ''} ${v?.segment ?? ''} ${v?.fuel ?? ''} 가격: ${v?.price_from ? `${v.price_from.toLocaleString()}원부터` : ''} ${v?.range_km ? `주행거리: ${v.range_km}km` : ''} ${v?.mpg ? `연비: ${v.mpg}km/L` : ''} ${v?.summary ?? ''}`.trim(),
         url: v?.url ?? ''
       }));
       const docsC = (centers as any[]).map((c:any, i:number)=>({
