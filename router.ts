@@ -336,9 +336,20 @@ try {
 }
 
 
+
+// --- RAG alias variants (canonical -> variants added to doc text at index time) ---
+const VARIANTS_CANON: Record<string, string[]> = {
+  '아반떼': ['아반테', 'avante', 'elantra'],
+  '쏘나타': ['소나타', 'sonata'],
+  '그랜저': ['그랜져', 'grandeur'],
+};
 function buildIndex(faqs: Faq[]) {
   DOCS = (faqs || []).map((it) => {
-    const text = `${it.q}\n${it.a}`;
+    let text = `${it.q}\n${it.a}`;
+    // __ALIAS_EXPANSION__: if canonical exists, append variants to document text
+    for (const [canon, vars] of Object.entries(VARIANTS_CANON)) {
+      if (text.includes(canon)) text += ' ' + vars.join(' ');
+    }
     const toks = tok(text);
     const tf: Record<string, number> = {};
     for (const t of toks) tf[t] = (tf[t] || 0) + 1;
@@ -352,6 +363,18 @@ function buildIndex(faqs: Faq[]) {
 
   const N = DOCS.length;
   IDF = new Map([...DF.entries()].map(([t, df]) => [t, Math.log((N - df + 0.5) / (df + 0.5) + 1)]));
+}
+
+
+// ❶ 인덱스 직후 한번만 코퍼스 구성 로그
+function logCorpusOnce(label: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const g:any = (globalThis as any);
+  if (g.__CORPUS_LOGGED__) return;
+  g.__CORPUS_LOGGED__ = true;
+  // @ts-ignore
+  const sample = (DOCS || []).slice(0, 3).map((d:any)=>({id:d.id, text:d.text?.slice(0,60)}));
+  console.log('[RAG] corpus', label, 'len=', (g.DOCS?.length ?? DOCS.length), 'sample=', sample);
 }
 
 function bm25Score(query: string, d: Doc) {
@@ -380,19 +403,53 @@ async function getFaqHard(): Promise<any[]> {
   return Array.isArray(json) ? json : (json?.items ?? []);
 }
 
+
 function ensureRagReady(buildIndex: (docs: any[]) => void) {
   if (!__ragInit__) {
     __ragInit__ = (async () => {
-      const raw = await getFaqHard();
-      const faqs = (raw || []).map((f: any, i: number) => ({
-        id: f?.id ?? String(i),
-        q: f?.q ?? f?.question ?? f?.title ?? "",
-        a: f?.a ?? f?.answer ?? f?.content ?? "",
-        url: f?.url ?? f?.link ?? ""
+      // 1) embedded corpus (always available)
+      const docsA = (faqEmbed as any[]).map((f:any, i:number)=>({
+        id: f?.id ?? `faq:${i}`,
+        q: f?.q ?? f?.question ?? f?.title ?? '',
+        a: f?.a ?? f?.answer ?? f?.content ?? '',
+        url: f?.url ?? f?.link ?? ''
       }));
-      buildIndex(faqs as any[]);
+      const docsB = (vehicles as any[]).map((v:any, i:number)=>({
+        id: v?.id ?? `veh:${i}`,
+        q: v?.model ?? v?.name ?? v?.trim ?? '',
+        a: `${v?.segment ?? ''} ${v?.fuel ?? ''} ${v?.summary ?? ''}`.trim(),
+        url: v?.url ?? ''
+      }));
+      const docsC = (centers as any[]).map((c:any, i:number)=>({
+        id: c?.id ?? `ctr:${i}`,
+        q: c?.name ?? c?.center ?? '',
+        a: `${c?.address ?? c?.addr ?? ''}`.trim(),
+        url: c?.url ?? ''
+      }));
+      let merged = [...docsA, ...docsB, ...docsC];
+
+      // 2) runtime /faq.json overrides FAQ portion
+      try {
+        const r = await fetch('/faq.json', { cache: 'no-store' });
+        if (r?.ok) {
+          const j = await r.json();
+          const arr = Array.isArray(j) ? j : (j?.items ?? []);
+          if (arr?.length) {
+            const docsR = (arr as any[]).map((f:any, i:number)=>({
+              id: f?.id ?? `faq:${i}`,
+              q: f?.q ?? f?.question ?? f?.title ?? '',
+              a: f?.a ?? f?.answer ?? f?.content ?? '',
+              url: f?.url ?? f?.link ?? ''
+            }));
+            merged = [...docsR, ...docsB, ...docsC];
+          }
+        }
+      } catch {}
+
+      buildIndex(merged as any[]);
+      logCorpusOnce('ensureRagReady');
       if ((import.meta as any).env?.DEV) {
-        console.log('[RAG] ensured & indexed from /faq.json:', faqs.length);
+        console.log('[RAG] built len=', (globalThis as any).DOCS?.length ?? 0);
       }
     })();
   }
@@ -411,26 +468,54 @@ function rewriteQuery(q: string) {
     .trim();
 }
 
-export async function retrieveFaq(query: string, { k = 4 } = {}) {
-  // Ensure RAG index is built on first call (Vercel cold start)
-  await ensureRagReady(buildIndex);
 
-  // ✅ 인덱스가 완전히 준비될 때까지 대기 (프로덕션 경쟁조건 해소)
+export async function retrieveFaq(query: string, { k = 4 } = {}) {
   await ensureRagReady(buildIndex);
 
   const q2 = rewriteQuery(query);
-  const ranked = DOCS
+
+  // 기본 BM25
+  let ranked = DOCS
     .map((d) => ({ d, s: bm25Score(q2, d) }))
-    .filter((x) => x.s >= MIN_SCORE)                 // ← >= 로
+    .filter((x) => x.s >= MIN_SCORE)
     .sort((a, b) => b.s - a.s)
     .slice(0, k)
     .map(({ d, s }) => ({ id: d.id, text: d.text, url: d.url, score: s }));
 
+  // 폴백 1: 점수 > 0
+  if (!ranked.length) {
+    const retry = DOCS
+      .map((d) => ({ d, s: bm25Score(q2, d) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, k)
+      .map(({ d, s }) => ({ id: d.id, text: d.text, url: d.url, score: s }));
+    if (retry.length) ranked = retry;
+  }
+
+  // 폴백 2: 부분문자열 포함 (변이어 포함)
+  if (!ranked.length) {
+    const qRaw = (query || '').trim();
+    const variants = new Set<string>([qRaw]);
+    for (const [canon, vars] of Object.entries(VARIANTS_CANON)) {
+      if (qRaw.includes(canon)) vars.forEach(v => variants.add(qRaw.replace(canon, v)));
+      vars.forEach(v => { if (qRaw.includes(v)) variants.add(qRaw.replace(v, canon)); });
+    }
+    for (const qv of variants) {
+      const hits = DOCS
+        .filter((d) => d.text.includes(qv))
+        .slice(0, k)
+        .map((d) => ({ id: d.id, text: d.text, url: d.url, score: 0 }));
+      if (hits.length) { ranked = hits; break; }
+    }
+  }
+
   if ((import.meta as any).env?.DEV) {
-    console.log('[BM25] retr_total=', DOCS.length, 'retr_k=', ranked.length, 'q=', query, ranked);
+    console.log('[BM25]', 'retr_total=', DOCS.length, 'retr_k=', ranked.length, 'q=', query, ranked);
   }
   return ranked;
 }
+
 
 
 // dev-only: window.__bm25("질문", k)
