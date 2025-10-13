@@ -1239,7 +1239,7 @@ Promise<BotReply> {
     // 미니모델 휴리스틱
     const useMini = text.length <= 20 && !/(보증|가격|프로모션|리콜|보조금)/.test(text);
 
-    const gen: any = await callLLM(prompt, { maxOutputTokens: 400, useMini });
+    let gen: any = await callLLM(prompt, { maxOutputTokens: 400, useMini });
 
     // 모델/토큰 메타
     __meta.model =
