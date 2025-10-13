@@ -307,7 +307,7 @@ type Doc = {
 
 const K1 = 1.5;
 const B = 0.75;
-const MIN_SCORE = 0.15; // 너무 낮으면 잡음↑
+const MIN_SCORE = 0.05; // 너무 낮으면 잡음↑
 
 // 한글/영문/숫자만 남기고 공백 분리
 function tok(s: string) {
@@ -354,6 +354,18 @@ function buildIndex(faqs: Faq[]) {
   IDF = new Map([...DF.entries()].map(([t, df]) => [t, Math.log((N - df + 0.5) / (df + 0.5) + 1)]));
 }
 
+
+// ❶ 인덱스 직후 한번만 코퍼스 구성 로그
+function logCorpusOnce(label: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const g:any = (globalThis as any);
+  if (g.__CORPUS_LOGGED__) return;
+  g.__CORPUS_LOGGED__ = true;
+  // @ts-ignore
+  const sample = (DOCS || []).slice(0, 3).map((d:any)=>({id:d.id, text:d.text?.slice(0,60)}));
+  console.log('[RAG] corpus', label, 'len=', (g.DOCS?.length ?? DOCS.length), 'sample=', sample);
+}
+
 function bm25Score(query: string, d: Doc) {
   const qToks = Array.from(new Set(tok(query)));
   let s = 0;
@@ -380,18 +392,57 @@ async function getFaqHard(): Promise<any[]> {
   return Array.isArray(json) ? json : (json?.items ?? []);
 }
 
+
 function ensureRagReady(buildIndex: (docs: any[]) => void) {
   if (!__ragInit__) {
     __ragInit__ = (async () => {
-      const docs = await getFaqHard();
-      buildIndex(docs); // ← 기존에 쓰던 인덱스 빌더를 그대로 호출
-      // 콘솔 확인용 (필요 시 주석 처리)
+      // 1) embedded corpus (always available)
+      const docsA = (faqEmbed as any[]).map((f:any, i:number)=>({
+        id: f?.id ?? `faq:${i}`,
+        q: f?.q ?? f?.question ?? f?.title ?? '',
+        a: f?.a ?? f?.answer ?? f?.content ?? '',
+        url: f?.url ?? f?.link ?? ''
+      }));
+      const docsB = (vehicles as any[]).map((v:any, i:number)=>({
+        id: v?.id ?? `veh:${i}`,
+        q: v?.model ?? v?.name ?? v?.trim ?? '',
+        a: `${v?.segment ?? ''} ${v?.fuel ?? ''} ${v?.summary ?? ''}`.trim(),
+        url: v?.url ?? ''
+      }));
+      const docsC = (centers as any[]).map((c:any, i:number)=>({
+        id: c?.id ?? `ctr:${i}`,
+        q: c?.name ?? c?.center ?? '',
+        a: `${c?.address ?? c?.addr ?? ''}`.trim(),
+        url: c?.url ?? ''
+      }));
+      let merged = [...docsA, ...docsB, ...docsC];
+
+      // 2) runtime /faq.json overrides FAQ portion
+      try {
+        const r = await fetch('/faq.json', { cache: 'no-store' });
+        if (r?.ok) {
+          const j = await r.json();
+          const arr = Array.isArray(j) ? j : (j?.items ?? []);
+          if (arr?.length) {
+            const docsR = (arr as any[]).map((f:any, i:number)=>({
+              id: f?.id ?? `faq:${i}`,
+              q: f?.q ?? f?.question ?? f?.title ?? '',
+              a: f?.a ?? f?.answer ?? f?.content ?? '',
+              url: f?.url ?? f?.link ?? ''
+            }));
+            merged = [...docsR, ...docsB, ...docsC];
+          }
+        }
+      } catch {}
+
+      buildIndex(merged as any[]);
+      logCorpusOnce('ensureRagReady');
       if ((import.meta as any).env?.DEV) {
-        console.log('[RAG] index built:', docs.length);
+        console.log('[RAG] built len=', (globalThis as any).DOCS?.length ?? 0);
       }
     })();
   }
-  return __ragInit__;
+  return __ragInit__!;
 }
 
 
@@ -406,23 +457,47 @@ function rewriteQuery(q: string) {
     .trim();
 }
 
+
 export async function retrieveFaq(query: string, { k = 4 } = {}) {
-  // ✅ 인덱스가 완전히 준비될 때까지 대기 (프로덕션 경쟁조건 해소)
   await ensureRagReady(buildIndex);
 
   const q2 = rewriteQuery(query);
-  const ranked = DOCS
+
+  // 기본 BM25
+  let ranked = DOCS
     .map((d) => ({ d, s: bm25Score(q2, d) }))
-    .filter((x) => x.s >= MIN_SCORE)                 // ← >= 로
+    .filter((x) => x.s >= MIN_SCORE)
     .sort((a, b) => b.s - a.s)
     .slice(0, k)
     .map(({ d, s }) => ({ id: d.id, text: d.text, url: d.url, score: s }));
 
+  // 폴백 1: 점수 > 0
+  if (!ranked.length) {
+    const retry = DOCS
+      .map((d) => ({ d, s: bm25Score(q2, d) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, k)
+      .map(({ d, s }) => ({ id: d.id, text: d.text, url: d.url, score: s }));
+    if (retry.length) ranked = retry;
+  }
+
+  // 폴백 2: 부분문자열 포함
+  if (!ranked.length) {
+    const qRaw = (query || '').trim();
+    const hits = DOCS
+      .filter((d) => d.text.includes(qRaw))
+      .slice(0, k)
+      .map((d) => ({ id: d.id, text: d.text, url: d.url, score: 0 }));
+    if (hits.length) ranked = hits;
+  }
+
   if ((import.meta as any).env?.DEV) {
-    console.log('[BM25] retr_total=', DOCS.length, 'retr_k=', ranked.length, 'q=', query, ranked);
+    console.log('[BM25]', 'retr_total=', DOCS.length, 'retr_k=', ranked.length, 'q=', query, ranked);
   }
   return ranked;
 }
+
 
 
 // dev-only: window.__bm25("질문", k)
