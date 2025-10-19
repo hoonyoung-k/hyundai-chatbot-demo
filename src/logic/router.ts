@@ -14,6 +14,7 @@ import faqEmbed from "../assets/faq.json";
 
 
 
+
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
@@ -309,14 +310,19 @@ const K1 = 1.5;
 const B = 0.75;
 const MIN_SCORE = 0.05; // 너무 낮으면 잡음↑
 
-// 한글/영문/숫자만 남기고 공백 분리
+// 배포 안전 토크나이저: Unicode property escape 미사용
 function tok(s: string) {
   return (s || "")
+    .normalize("NFKC")
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/[^0-9a-z\uac00-\ud7a3\s]/g, " ")
+    .replace(/([a-z\uac00-\ud7a3])\s+([0-9]+)/gi, "$1$2")
+    .replace(/(ev)\s*([0-9]+)/gi, "$1$2")
     .split(/\s+/)
     .filter(Boolean);
 }
+
+
 
 let DOCS: Doc[] = [];
 let IDF = new Map<string, number>();
@@ -333,6 +339,16 @@ try {
   }
 } catch (e) {
   console.warn("[RAG] prebuild failed", e);
+}
+
+// === RAG 인덱스 워밍업 (브라우저에서만, 렌더 블로킹 금지) ===
+if (typeof window !== 'undefined') {
+  // 렌더 먼저 → 이벤트 루프로 미루기(순환참조/초기 fetch 충돌 회피)
+  setTimeout(() => {
+    ensureRagReady(buildIndex)
+      .then(() => console.log('[RAG-init] warm ok'))
+      .catch((e) => console.warn('[RAG-init] warm fail', e));
+  }, 0);
 }
 
 
@@ -537,7 +553,10 @@ function buildPrompt(retr: Array<{ text: string; url?: string }>, userText: stri
     "당신은 현대자동차 공식 FAQ 전용 챗봇입니다.",
     "아래 [Retrieved Context] 8개 중 실제로 관련 있는 4개 근거만 사용하세요.",
     "링크는 말풍선에 넣지 마세요. 링크가 필요하면 '공식 안내 보기' 버튼으로만 제공됩니다.",
-    "문서에 관련 내용이 없으면, '죄송합니다. 현대자동차 관련 내용만 답변 가능하며, 준비되지 않은 답변일 수 있습니다. 더 궁금하신 내용이 있으신가요?'라고 답하세요.",
+    "문서가 완벽히 일치하지 않아도 가장 관련 높은 내용으로 요약해 답하세요.",
+"불확실하면 '자세한 내용은 공식 안내 보기 버튼에서 확인하세요.'라고만 안내하세요.",
+"사과문 문구(예: 죄송합니다…)는 사용하지 마세요.",
+
     "",
     "[Retrieved Context]",
     ctx,
@@ -609,7 +628,7 @@ Promise<BotReply> {
 
       if (OOD_POLICY.test(raw) || OOD_POLICY.test(squished)) {
         const msg =
-          "결제/환불·개인정보·정책 관련 문의는 본 챗봇에서 정확히 확인이 어려워요. 공식 고객센터로 연결해 드릴게요.";
+          "개인정보·정책 관련 문의는 본 챗봇에서 정확히 확인이 어려워요. 공식 고객센터로 연결해 드릴게요.";
         const reply: BotReply = {
           messages: [msg],
           chips: ["자주 묻는 질문", "처음으로"],
@@ -619,6 +638,24 @@ Promise<BotReply> {
 
         };
         (reply as any).__meta = { path: "Fallback", reason: "OOD_policy_guard" };
+        return reply;
+      }
+    }
+
+    // === Hard OOD guard (RAG보다 우선, ALLOW_OPEN_DOMAIN와 무관하게 차단) ===
+    {
+      const raw = (text ?? '').toLowerCase().trim();
+      const squished = raw.replace(/\s+/g, '');
+
+      // 날씨/뉴스/일상생활성 주제는 현대차 범위 외로 고정
+      const OOD_HARD = /(날씨|기상|미세먼지|온도|기온|우산|일기예보|뉴스|연예|음악|영화|드라마|스포츠|맛집|배달|택시|지하철|버스)/i;
+
+      if (OOD_HARD.test(raw) || OOD_HARD.test(squished) || isOOD(text)) {
+        const reply = makeFallbackReply(
+          ["현대자동차 차량·서비스 범위의 질문만 답변해요. 예) 소나타 가격, 보증기간, 가까운 서비스센터"],
+          ["혜택", "자주 묻는 질문", "처음으로"]
+        );
+        (reply as any).__meta = { path: "Fallback", reason: "OOD_hard_guard" };
         return reply;
       }
     }
@@ -734,6 +771,9 @@ Promise<BotReply> {
   }
 
   const N = normalizeK(text);
+  
+  console.debug("[RAG-norm]", { raw: text, basic: N.basic, compact: N.compact });
+
 
 
   let { intent, entities } = parseIntent(text);
@@ -1222,6 +1262,51 @@ Promise<BotReply> {
 
 
 
+    // [RAG] Model booster — 현대 차종 키워드가 잡히고 상위 결과가 빈약하면
+    // 한 장짜리 힌트 문서를 주입해 RAG 경로를 보장.
+    {
+      // 1) 정규화된 모델명 추출 (파일 상단에 이미 정의된 함수)
+      const canon = extractCanonicalModel(N); // ← 바로 이렇게 직호출
+
+      // 2) 상위 결과가 빈약한지 판단
+      const needBoost =
+        (!retr || retr.length < 4) || (topScore < Math.max(0.08, OOD_THRESHOLD));
+
+      if (canon && needBoost) {
+        // (선택) vehicles.json에서 찾고, 없으면 일반 힌트
+        const v = (vehicles as any[]).find(v => {
+          const name = (v?.model || v?.name || "").toString().toLowerCase();
+          return name.includes(canon.toLowerCase());
+        });
+
+        const hintText = v
+          ? `모델: ${v.model}\n세그먼트: ${v.segment || ''}\n개요: ${v.summary || ''}`.trim()
+          : `${canon}는 현대자동차의 세단(모델)입니다. 공식 페이지에서 제원/트림을 확인하세요.`;
+        const hintUrl = (v?.url || "https://www.hyundai.com/kr/ko/e/vehicles").trim();
+
+        const booster = {
+          id: `hint:${canon}`,
+          text: hintText,
+          url: hintUrl,
+          // 임계값을 확실히 넘기도록 기존 topScore와 임계값 중 큰 값으로 세팅
+          score: Math.max(topScore || 0, OOD_THRESHOLD || 0),
+        };
+
+        // 중복 방지 후 최상단 삽입 + topScore 갱신
+        const seen = new Set((retr || []).map(r => r.id));
+        if (!seen.has(booster.id)) {
+          retr = [booster, ...(retr || [])];
+        }
+        topScore = Math.max(topScore || 0, booster.score || 0);
+
+        // 디버그
+        console.debug("[RAG-booster]", { canon, needBoost, topScore });
+      }
+    }
+
+
+
+
     
 
     // ✅ 하이리스크는 'FAQ 매칭 확신 실패'일 때만 차단
@@ -1285,9 +1370,12 @@ Promise<BotReply> {
     const looksOOD_basic  = isOOD(N.basic);
     const looksOOD_spaced = isOOD(spacedBasic);  
 
-    // ✅ 확신도: 점수로 1차, 주행거리/배터리/제원 키워드면 완화
+    // ✅ 확신도: retr만 있어도 기본 신뢰 + 점수/스펙 힌트 보정
     const specHint = /(주행거리|1회\s*충전|배터리\s*용량|충전\s*시간|제원)/.test(N.basic);
-    const isFaqConfident = (!looksOOD && topScore >= OOD_THRESHOLD) || (retr?.length > 0 && specHint);
+    const hasAnyRetr = (retr?.length ?? 0) > 0;
+    // retr이 있으면 무조건 RAG 경로(사과문 방지). 점수/스펙 힌트는 보조.
+    const isFaqConfident = hasAnyRetr || (!looksOOD && topScore >= OOD_THRESHOLD) || specHint;
+
 
     // ✅ 디버그 #2: 최종 판정 직전
     {
@@ -1380,9 +1468,19 @@ Promise<BotReply> {
     }
 
     // 3) 성공 응답
-    const out = cleanText(guardOutput(gen.text));
+    let out = cleanText(guardOutput(gen.text));
+
+    // --- Anti-apology guard: RAG 경로인데도 사과문이면 컨텍스트 요약으로 대체
+    if ((retr?.length ?? 0) > 0 && APOLOGY_REGEX.test(out)) {
+      const first = (retr[0]?.text || "").split("\n").slice(0, 2).join(" ").trim();
+      out = first
+        ? `${first}\n\n자세한 내용은 아래 '자세히 보기' 버튼에서 확인하세요.`
+        : "관련 문서를 바탕으로 요약하여 안내드렸습니다.";
+    }
+
     const suppressCta = usingOpenDomain || APOLOGY_REGEX.test(out);
     const primaryUrl = suppressCta ? null : pickPrimaryUrl(retr);
+
 
     __meta.primaryUrl = primaryUrl;
 
