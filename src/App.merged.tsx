@@ -598,7 +598,7 @@ const renderList = useMemo(() => {
 const MODELS = [
   { id: 'ioniq5', name: '아이오닉 5', type: 'EV', body: 'SUV', priceFrom: 52000000, range: 303, popular: true, promo: true,   
     promoDiscountPct: 10,                                   // ★ 할인율(%)
-    promoEndsAt: '2025-12-31T23:59:59+09:00'               // ★ 혜택 종료 시각(서울 TZ)
+    promoEndsAt: '2026-05-21T23:59:59+09:00'               // ★ 혜택 종료(약 60일 후, 서울 TZ)
   },
   { id: 'kona-ev',  name: '코나 일렉트릭',  type: 'EV',  body: 'SUV',       priceFrom: 42000000, range: 410, popular: true },
   { id: 'ev6',      name: 'EV6',            type: 'EV',  body: 'Crossover', priceFrom: 55000000, range: 475 },
@@ -606,28 +606,34 @@ const MODELS = [
   // ===== 추가 EV 모델들 =====
   { id: 'ioniq6', name: '아이오닉 6', type: 'EV', body: 'Sedan',
     priceFrom: 56000000, range: 524, popular: true, promo: true,
-    promoDiscountPct: 8, promoEndsAt: '2025-11-30T23:59:59+09:00'
+    promoDiscountPct: 8, promoEndsAt: '2026-06-20T23:59:59+09:00'
   },
   { id: 'ioniq5n', name: '아이오닉 5 N', type: 'EV', body: 'SUV',
     priceFrom: 87000000, range: 450, popular: false, promo: false
   },
   { id: 'kona-ev-long', name: '코나 일렉트릭 롱레인지', type: 'EV', body: 'SUV',
-    priceFrom: 45500000, range: 490, popular: true, promo: true,
-    promoDiscountPct: 5, promoEndsAt: '2025-08-15T23:59:59+09:00'
+    priceFrom: 45500000, range: 490, popular: true, promo: false,
   },
   { id: 'casper-ev', name: '캐스퍼 일렉트릭', type: 'EV', body: 'Compact',
-    priceFrom: 29800000, range: 315, popular: true, promo: true,
-    promoDiscountPct: 6, promoEndsAt: '2025-07-31T23:59:59+09:00'
+    priceFrom: 29800000, range: 315, popular: true, promo: false,
   },
 
   // ===== 기존 HEV/ICE =====
   { id: 'santafe-hev', name: '싼타페 하이브리드', type: 'HEV', body: 'SUV', priceFrom: 37740000, mpg: 30.6, popular: true },
-  { id: 'palisade',    name: '팰리세이드',        type: 'ICE', body: 'SUV', priceFrom: 40160000, popular: false, 
-    promo: true, promoDiscountPct: 7, promoEndsAt: '2026-08-15T23:59:59+09:00'
+  { id: 'palisade',    name: '팰리세이드',        type: 'ICE', body: 'SUV', priceFrom: 52000000, popular: false,
+    promo: true,
+    promoDiscountPct: 10,
+    promoEndsAt: '2026-09-21T23:59:59+09:00',
   },
-  { id: 'avante',      name: '아반떼',            type: 'ICE', body: 'Sedan', priceFrom: 21000000, popular: true,  promo: true,
-    promoDiscountPct: 5, promoEndsAt: '2026-03-01T23:59:59+09:00'
+  { id: 'avante',      name: '아반떼',            type: 'ICE', body: 'Sedan', priceFrom: 21000000, popular: true,  promo: false,
   },
+
+  // ===== 모델 허브 추가 차량 =====
+  { id: 'sonata', name: '쏘나타', type: 'ICE', body: 'Sedan', priceFrom: 29920000, popular: true, promo: false },
+  { id: 'grandeur', name: '그랜저', type: 'ICE', body: 'Sedan', priceFrom: 37170000, popular: true, promo: false },
+  { id: 'tucson', name: '투싼', type: 'ICE', body: 'SUV', priceFrom: 27730000, popular: true, promo: false },
+  { id: 'staria', name: '스타리아', type: 'ICE', body: 'MPV', priceFrom: 36330000, popular: false, promo: false },
+  { id: 'nexo', name: '넥쏘', type: 'ICE', body: 'SUV', priceFrom: 75000000, popular: false, promo: false },
 ];
 
 const LOCATIONS = [
@@ -1036,9 +1042,8 @@ function ModelOverlay({
   goBuilder: () => void;
   openNetwork: (presetKind?: string | null) => void;
 }) {
-  if (!open) return null;
-
   const [promoOnly, setPromoOnly] = useState(!!opts?.promo);
+  if (!open) return null;
 
   const header = (
     <div className="sticky top-0 z-10 bg-[#0b1b2b] text-white">
@@ -1265,45 +1270,13 @@ function NetworkSheet({ open, onClose, presetKind }: any) {
     return withD.slice(0, limit);
   }, [kind, evOnly, limit, geo?.lat, geo?.lng]);
 
-  // ... 렌더 부분
-  {/* 리스트 렌더 내부 버튼 영역만 교체 */}
-  {list.map((l: any) => (
-    <div key={l.id} className="rounded-xl border border-slate-200 p-3 flex items-center justify-between">
-      <div>
-        <div className="font-medium text-slate-900">{l.name}</div>
-        <div className="text-sm text-slate-500">
-          {l.kind} · {fmtKm(l._dKm, l.distance_km)}
-        </div>
-      </div>
-      <div className="flex gap-2">
-        {(l.mapsUrl || l.placeUrl) && (
-          <button
-            className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
-            onClick={() => {
-              const url = l.mapsUrl || l.placeUrl; // mapsUrl 우선, 없으면 placeUrl
-              window.open(url, '_blank', 'noopener,noreferrer');
-            }}
-          >
-            지도
-          </button>
-        )}
-        <button
-          className="rounded-lg bg-[#0b1b2b] text-white px-2 py-1 text-sm"
-          onClick={() => handleCall(l.phone)}
-        >
-          전화
-        </button>
-      </div>
-    </div>
-  ))}
-
   // ESC 닫기
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && safeClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, safeClose]);
 
   if (!open) return null;
 
@@ -1311,7 +1284,7 @@ function NetworkSheet({ open, onClose, presetKind }: any) {
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
       <div
         className="absolute inset-0 bg-black/40 z-0 pointer-events-auto touch-none"
-        onClick={onClose}
+        onClick={safeClose}
       />
       <div
         className="absolute inset-x-0 bottom-0 mx-auto max-w-md rounded-t-2xl bg-white shadow-xl z-10
@@ -1376,9 +1349,9 @@ function NetworkSheet({ open, onClose, presetKind }: any) {
           </div>
 
           <div className="space-y-2">
-            {list.map((l: any) => (
+            {list.map((l: any, idx: number) => (
               <div
-                key={l.id}
+                key={`${kind}::${String(l.id ?? '')}::${String(l.name ?? '')}::${idx}`}
                 className="rounded-xl border border-slate-200 p-3 flex items-center justify-between"
               >
                 <div>
@@ -1636,12 +1609,8 @@ export default function App() {
   };
 
   // body scroll lock (모달 열릴 때)
-  // App()의 body scroll lock useEffect에 modelOpen도 포함
   useEffect(() => {
-    // 스크롤 락 처리
     const lock = networkOpen || faqOpen || modelOpen;
-    const prevOverflow = document.body.style.overflow;
-    const prevPaddingRight = document.body.style.paddingRight;
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
 
     if (lock) {
@@ -1649,10 +1618,17 @@ export default function App() {
       if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
     } else {
       document.body.style.overflow = '';
-      document.body.style.paddingRight = prevPaddingRight;
+      document.body.style.paddingRight = '';
     }
 
-    // ✅ 이벤트 리스너 등록
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    };
+  }, [networkOpen, faqOpen, modelOpen]);
+
+  // 전역 이벤트 리스너는 1회만 등록
+  useEffect(() => {
     const onOpenModelHub = (ev: Event) => {
       const e = ev as CustomEvent<any>;
       const { tab = 'ALL', promoOnly = false } = e.detail || {};
@@ -1677,14 +1653,11 @@ export default function App() {
 
 
     return () => {
-      // cleanup
-      document.body.style.overflow = prevOverflow;
-      document.body.style.paddingRight = prevPaddingRight;
       window.removeEventListener('open-model-hub', onOpenModelHub as EventListener);
       window.removeEventListener('open-faq', onOpenFaq as EventListener);
       window.removeEventListener('open-network', onOpenNetwork as EventListener); // ★ 추가
     };
-  }, [networkOpen, faqOpen, modelOpen, setFaqOpen]);
+  }, []);
 
 
   // ✅ 닫기 이벤트 (서비스센터/시승예약 오버레이 전용)

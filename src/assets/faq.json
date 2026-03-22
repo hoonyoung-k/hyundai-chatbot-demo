@@ -9766,5 +9766,212 @@
       "Top 50"
     ],
     "category": "Top 50"
+  },
+  {
+    "id": "faq-kb-001",
+    "q": "아반떼 아반테 avante 엘란트라 elantra",
+    "a": "아반떼는 현대자동차의 대표 준중형 세단으로, 일상 주행과 경제성을 균형 있게 갖춘 모델입니다. 최신 트림과 옵션은 연식에 따라 달라질 수 있어 공식 페이지에서 상세 사양을 함께 확인하는 것이 좋습니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/avante/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-002",
+    "q": "아반떼 N 아반떼n 아반테n avante n",
+    "a": "아반떼 N은 고성능 N 라인업의 준중형 퍼포먼스 세단으로, 서킷 주행 성능과 일상 주행의 활용성을 함께 고려한 모델입니다. 파워트레인과 주행 보조 사양은 연식별로 다를 수 있어 공식 제원표 확인이 필요합니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/avante-n/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-003",
+    "q": "쏘나타 소나타 sonata",
+    "a": "쏘나타는 현대자동차의 대표 중형 세단으로, 가솔린 및 하이브리드 라인업을 중심으로 운영됩니다. 패밀리카 수요가 많은 모델이며, 트림별 편의·안전 사양 구성이 폭넓은 편입니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/sonata/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-004",
+    "q": "그랜저 그랜져 grandeur",
+    "a": "그랜저는 현대자동차의 대표 준대형 세단으로, 승차감과 정숙성, 고급 편의사양이 강점인 모델입니다. 라인업 구성은 시기별로 달라질 수 있으므로 최신 트림 정보 확인이 중요합니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/grandeur/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-005",
+    "q": "싼타페 산타페 santafe santa fe",
+    "a": "싼타페는 현대자동차의 중형 SUV로, 가족 단위 고객이 선호하는 실내 공간과 주행 안정성을 제공하는 모델입니다. 파워트레인 구성과 첨단 보조 기능은 연식 및 트림별로 달라집니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/santafe/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-006",
+    "q": "투싼 투산 tucson",
+    "a": "투싼은 현대자동차의 준중형 SUV로, 도심 주행과 장거리 주행 모두에서 균형 잡힌 활용성을 갖춘 모델입니다. 최신 트림에는 운전자 보조와 인포테인먼트 기능이 강화되어 제공됩니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/tucson/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-007",
+    "q": "팰리세이드 펠리세이드 palisade",
+    "a": "팰리세이드는 현대자동차의 대형 SUV로, 넓은 실내와 장거리 이동 편의성이 강점인 모델입니다. 패밀리 및 다인승 수요에 맞춘 시트 구성과 편의사양이 주요 특징입니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/palisade/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-008",
+    "q": "코나 kona",
+    "a": "코나는 현대자동차의 소형 SUV 라인업으로, 도심 중심 사용성과 개성 있는 디자인이 특징입니다. 내연기관, 하이브리드, 일렉트릭 등 파워트레인 선택지가 연식별로 운영됩니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/kona/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-009",
+    "q": "캐스퍼 casper",
+    "a": "캐스퍼는 현대자동차의 경형 SUV로, 도심 주차와 일상 주행에 적합한 기동성이 강점입니다. 젊은 고객층과 세컨드카 수요에서 관심이 높은 모델로 평가됩니다.",
+    "url": "https://casper.hyundai.com/",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-010",
+    "q": "스타리아 staria",
+    "a": "스타리아는 현대자동차의 MPV/밴 라인업으로, 다인승 이동과 비즈니스 목적 수요를 함께 고려한 모델입니다. 라운지 등 세부 라인에 따라 좌석 구성과 편의 사양이 달라집니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/staria/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-011",
+    "q": "포터 포터2 포터 ii porter2 porter ii",
+    "a": "포터는 현대자동차의 대표 소형 상용 트럭 라인업으로, 자영업·물류·도심 배송 등 실사용 중심 환경에서 널리 활용됩니다. 세부 모델과 적재 관련 사양은 용도별 트림에서 확인할 수 있습니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/porter2/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-012",
+    "q": "아이오닉 5 아이오닉5 ioniq5 ioniq 5",
+    "a": "아이오닉 5는 현대자동차 전용 전기차 라인업의 핵심 중형급 모델로, E-GMP 기반의 실내 공간과 충전 편의성이 강점입니다. 트림별 배터리 용량과 주행 가능 거리는 상이할 수 있습니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/ioniq5/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-013",
+    "q": "아이오닉 6 아이오닉6 ioniq6 ioniq 6",
+    "a": "아이오닉 6는 공력 성능을 강조한 현대자동차 전기 세단으로, 효율 중심 설계와 장거리 주행 편의성이 특징입니다. 실제 주행 가능 거리와 충전 시간은 주행 조건에 따라 달라질 수 있습니다.",
+    "url": "https://www.hyundai.com/kr/ko/vehicles/ioniq6/intro",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-014",
+    "q": "아이오닉 9 아이오닉9 ioniq9 ioniq 9",
+    "a": "아이오닉 9은 현대자동차 전기 SUV 라인업의 플래그십 포지션으로, 대형 공간과 최신 전동화 기술을 중심으로 설계된 모델입니다. 출시 시점과 세부 사양은 공식 공지 기준으로 확인하는 것이 정확합니다.",
+    "url": "https://www.hyundai.com/kr/ko/e/vehicles/ioniq9",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-015",
+    "q": "G70 g70 g 70",
+    "a": "G70은 제네시스의 스포츠 세단 라인업으로, 주행 성능과 고급스러운 실내 품질을 함께 제공하는 모델입니다. 파워트레인과 구동 방식에 따라 성격이 달라질 수 있습니다.",
+    "url": "https://www.genesis.com/kr/ko/models/luxury-sedan-genesis/g70/highlights.html",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-016",
+    "q": "G80 g80 g 80",
+    "a": "G80은 제네시스의 대표 럭셔리 세단으로, 승차감과 정숙성, 첨단 운전자 보조 기술이 강점인 모델입니다. 내연기관과 전동화 파생 모델이 함께 운영될 수 있습니다.",
+    "url": "https://www.genesis.com/kr/ko/models/luxury-sedan-genesis/g80/highlights.html",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-017",
+    "q": "G90 g90 g 90",
+    "a": "G90은 제네시스 플래그십 세단으로, 최고급 편의사양과 정숙한 주행 품질을 중심으로 구성된 모델입니다. 의전 및 장거리 이동 수요에서 선호도가 높은 편입니다.",
+    "url": "https://www.genesis.com/kr/ko/models/luxury-sedan-genesis/g90/highlights.html",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-018",
+    "q": "GV60 gv60 gv 60",
+    "a": "GV60은 제네시스 전용 전기차 SUV 라인업으로, 전동화 성능과 프리미엄 감성을 결합한 모델입니다. 충전·주행 성능은 배터리 및 주행 조건에 따라 달라집니다.",
+    "url": "https://www.genesis.com/kr/ko/models/luxury-suv-genesis/gv60/highlights.html",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-019",
+    "q": "GV70 gv70 gv 70",
+    "a": "GV70은 제네시스 중형 SUV 라인업으로, 주행 성능과 실내 고급감을 균형 있게 제공하는 모델입니다. 내연기관과 전동화 모델이 함께 비교되는 대표 차종입니다.",
+    "url": "https://www.genesis.com/kr/ko/models/luxury-suv-genesis/gv70/highlights.html",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-020",
+    "q": "GV80 gv80 gv 80",
+    "a": "GV80은 제네시스 대형 SUV 라인업의 중심 모델로, 넓은 공간과 고급 사양, 안정적인 장거리 주행 성능이 특징입니다. 쿠페 파생 모델 등 라인업 구성이 시기별로 달라질 수 있습니다.",
+    "url": "https://www.genesis.com/kr/ko/models/luxury-suv-genesis/gv80/highlights.html",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-021",
+    "q": "정주영 현대 창업자",
+    "a": "정주영은 현대그룹 창업자로, 현대 산업 발전의 기반을 만든 인물로 평가됩니다. 현대자동차의 역사와 기업 문화의 출발점에서 자주 언급되는 핵심 인물입니다.",
+    "url": "https://www.hyundai.com/kr/ko/company-intro/history",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-022",
+    "q": "정몽구 현대차그룹",
+    "a": "정몽구는 현대차그룹의 성장을 이끈 주요 경영자로, 글로벌 생산·품질 체계 강화 시기에 핵심 역할을 수행한 인물로 알려져 있습니다. 현대차그룹 역사 맥락에서 자주 함께 언급됩니다.",
+    "url": "https://www.hyundai.com/kr/ko/company-intro/history",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
+  },
+  {
+    "id": "faq-kb-023",
+    "q": "정의선 현대자동차그룹 회장",
+    "a": "정의선은 현대자동차그룹 회장으로, 전동화·소프트웨어·모빌리티 전환 전략을 주도하는 경영 리더로 소개됩니다. 최근 현대차그룹의 미래 전략과 연계해 자주 언급되는 핵심 인물입니다.",
+    "url": "https://www.hyundai.com/kr/ko/company-intro/history",
+    "a_html": "nan",
+    "categories": ["핵심엔티티"],
+    "category": "핵심엔티티"
   }
 ]

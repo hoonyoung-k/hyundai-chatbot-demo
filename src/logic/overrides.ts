@@ -7,7 +7,7 @@ const norm = (s?: string) =>
 let _map: Map<string, R3Override> | null = null;
 
 export async function loadOverrides(): Promise<Map<string, R3Override>> {
-  if (_map) return _map;
+  if (_map && _map.size > 0) return _map;
   // CSV를 텍스트로 읽고 헤더 파싱
   const res = await fetch('/r3_overrides.csv', { cache: 'no-store' });
   if (!res.ok) { _map = new Map(); return _map; }

@@ -173,11 +173,12 @@ async function answerWithFaqId(faqId: string, meta: Record<string, any> = {}): P
   const hit = (faqs as FaqItem[]).find(f => f.id === faqId);
   if (!hit) return null;
   const msg = guardOutput(hit.a);
+  const noCta = Boolean(meta?.noCta) || /^faq-kb-/i.test(String(hit.id || ""));
   const reply: BotReply = {
     messages: [msg],
     chips: ["자주 묻는 질문", "처음으로"],
     cards: [],
-    sticky_cta: buildSingleCTA(hit.url ?? null),
+    sticky_cta: noCta ? null : buildSingleCTA(hit.url ?? null),
   };
   (reply as any).__meta = { path: "RAG", ...meta, primaryUrl: hit.url ?? null };
   return reply;
@@ -231,7 +232,22 @@ function cleanText(t: string) {
     .replace(/^문서\d+:\s*/gm, "")
     .replace(/\[[^\]]*출처[^\]]*\]/g, "")
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1 ($2)") // MD 링크 평문화
+    .replace(/공식\s*안내\s*보기\s*버튼(?:을)?(?:\s*이용)?(?:해\s*주세요|을\s*눌러\s*주세요|을\s*통해\s*확인해\s*주세요)?\.?/gi, "")
+    .replace(/자세히\s*보기\.?/gi, "")
+    .replace(/공식\s*안내(?:를)?\s*확인해\s*주세요\.?/gi, "")
+    .replace(/버튼(?:을)?\s*통해\s*확인(?:해\s*주세요)?\.?/gi, "")
     .trim();
+}
+
+const CORE_ENTITY_CANON = [
+  "아반떼", "아반떼 N", "쏘나타", "그랜저", "싼타페", "투싼", "팰리세이드",
+  "코나", "캐스퍼", "스타리아", "포터", "아이오닉 5", "아이오닉 6", "아이오닉 9",
+  "G70", "G80", "G90", "GV60", "GV70", "GV80", "정주영", "정몽구", "정의선",
+];
+
+function isCoreEntityQuery(text: string): boolean {
+  const q = rewriteQuery(text || "").toLowerCase();
+  return CORE_ENTITY_CANON.some((canon) => q.includes(canon.toLowerCase()));
 }
 
 // 사과 톤 감지(FAQ 밖/오픈도메인 가이드 문구)
@@ -322,6 +338,33 @@ let DOCS: Doc[] = [];
 let IDF = new Map<string, number>();
 let AVG_LEN = 1;
 
+// --- RAG alias variants (canonical -> variants added to doc text at index time) ---
+const VARIANTS_CANON: Record<string, string[]> = {
+  '아반떼': ['아반테', 'avante', '엘란트라', 'elantra'],
+  '아반떼 N': ['아반떼n', '아반테n', 'avante n', 'avante-n'],
+  '쏘나타': ['소나타', 'sonata'],
+  '그랜저': ['그랜져', 'grandeur'],
+  '싼타페': ['산타페', 'santafe', 'santa fe'],
+  '투싼': ['투산', 'tucson'],
+  '팰리세이드': ['펠리세이드', 'palisade'],
+  '코나': ['kona'],
+  '캐스퍼': ['casper'],
+  '스타리아': ['staria'],
+  '포터': ['포터2', '포터 ii', 'porter2', 'porter ii'],
+  '아이오닉 5': ['아이오닉5', 'ioniq5', 'ioniq 5'],
+  '아이오닉 6': ['아이오닉6', 'ioniq6', 'ioniq 6'],
+  '아이오닉 9': ['아이오닉9', 'ioniq9', 'ioniq 9'],
+  'G70': ['g70', 'g 70'],
+  'G80': ['g80', 'g 80'],
+  'G90': ['g90', 'g 90'],
+  'GV60': ['gv60', 'gv 60'],
+  'GV70': ['gv70', 'gv 70'],
+  'GV80': ['gv80', 'gv 80'],
+  '정주영': ['정주영 회장'],
+  '정몽구': ['정몽구 회장'],
+  '정의선': ['정의선 회장'],
+};
+
 // 🔥 앱 로드 시 임베드 데이터로 인덱스를 즉시 생성
 try {
   const _pre = (faqEmbed as any[]) || [];
@@ -334,15 +377,6 @@ try {
 } catch (e) {
   console.warn("[RAG] prebuild failed", e);
 }
-
-
-
-// --- RAG alias variants (canonical -> variants added to doc text at index time) ---
-const VARIANTS_CANON: Record<string, string[]> = {
-  '아반떼': ['아반테', 'avante', 'elantra'],
-  '쏘나타': ['소나타', 'sonata'],
-  '그랜저': ['그랜져', 'grandeur'],
-};
 function buildIndex(faqs: Faq[]) {
   DOCS = (faqs || []).map((it) => {
     let text = `${it.q}\n${it.a}`;
@@ -441,7 +475,12 @@ function ensureRagReady(buildIndex: (docs: any[]) => void) {
               a: f?.a ?? f?.answer ?? f?.content ?? '',
               url: f?.url ?? f?.link ?? ''
             }));
-            merged = [...docsR, ...docsB, ...docsC];
+            const byId = new Map<string, any>();
+            [...docsR, ...docsA].forEach((d: any) => {
+              const id = String(d?.id || "");
+              if (id && !byId.has(id)) byId.set(id, d);
+            });
+            merged = [...Array.from(byId.values()), ...docsB, ...docsC];
           }
         }
       } catch {}
@@ -459,13 +498,31 @@ function ensureRagReady(buildIndex: (docs: any[]) => void) {
 
 // 동의어/약어 리라이트(간단)
 function rewriteQuery(q: string) {
-  return (q || "")
+  let t = (q || "")
+    .normalize("NFKC")
     .toLowerCase()
+    .replace(/([가-힣a-z])\s+([0-9]+)/gi, "$1$2")
+    .replace(/(ev)\s*([0-9]+)/gi, "$1$2")
+    .replace(/(ioniq)\s*([0-9]+)/gi, "$1$2")
+    .replace(/[·,，]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // 차량명 variant -> canonical 치환 (정규화의 기준축)
+  for (const [canon, vars] of Object.entries(VARIANTS_CANON)) {
+    for (const v of vars) {
+      const p = v.toLowerCase().replace(/\s+/g, "\\s*");
+      t = t.replace(new RegExp(p, "gi"), canon);
+    }
+  }
+
+  t = t
     .replace(/네비/g, "내비게이션")
     .replace(/내비(?!게이션)/g, "내비게이션")
     .replace(/(지도|맵)\s*업데이트/g, "지도 업데이트")
-    .replace(/\bnavi(gation)?\b/g, "내비게이션")
-    .trim();
+    .replace(/\bnavi(gation)?\b/g, "내비게이션");
+
+  return t.trim();
 }
 
 
@@ -495,7 +552,7 @@ export async function retrieveFaq(query: string, { k = 4 } = {}) {
 
   // 폴백 2: 부분문자열 포함 (변이어 포함)
   if (!ranked.length) {
-    const qRaw = (query || '').trim();
+    const qRaw = rewriteQuery(query);
     const variants = new Set<string>([qRaw]);
     for (const [canon, vars] of Object.entries(VARIANTS_CANON)) {
       if (qRaw.includes(canon)) vars.forEach(v => variants.add(qRaw.replace(canon, v)));
@@ -536,7 +593,7 @@ function buildPrompt(retr: Array<{ text: string; url?: string }>, userText: stri
   return [
     "당신은 현대자동차 공식 FAQ 전용 챗봇입니다.",
     "아래 [Retrieved Context] 8개 중 실제로 관련 있는 4개 근거만 사용하세요.",
-    "링크는 말풍선에 넣지 마세요. 링크가 필요하면 '공식 안내 보기' 버튼으로만 제공됩니다.",
+    "링크나 버튼 안내 문구는 쓰지 말고, 필요한 정보는 문장으로만 간결히 답하세요.",
     "문서에 관련 내용이 없으면, '죄송합니다. 현대자동차 관련 내용만 답변 가능하며, 준비되지 않은 답변일 수 있습니다. 더 궁금하신 내용이 있으신가요?'라고 답하세요.",
     "",
     "[Retrieved Context]",
@@ -551,7 +608,7 @@ function buildGeneralPrompt(userText: string) {
   return [
     "현대자동차 관련 일반 지식으로 가능한 범위에서 간결히 답하세요.",
     "컨텍스트에 없을 수 있으니 추측을 피하고, 불확실하면 '죄송합니다. 현대자동차 관련 내용만 답변 가능하며, 준비되지 않은 답변일 수 있습니다. 더 궁금하신 내용이 있으신가요?'라고 답하세요.",
-    "말풍선에는 인라인 링크/각주를 넣지 마세요. 링크는 UI 버튼으로만 제공합니다.",
+    "말풍선에는 인라인 링크/각주/버튼 안내 문구를 넣지 마세요.",
     "",
     "사용자 질문:",
     userText,
@@ -563,6 +620,9 @@ function buildGeneralPrompt(userText: string) {
 // -----------------------------------------------------------------------------
 export async function routeUserText(text: string): 
 Promise<BotReply> {
+  const rewrittenText = rewriteQuery(text);
+  const __coreEntityQuery = isCoreEntityQuery(rewrittenText || text);
+
   // ✅ EV 추천 하드 매칭 — 함수 진입 직후에 위치해야 함!
   {
     const t = (text ?? '').trim().replace(/[.!?]$/, ''); // 말끝 마침표 제거
@@ -627,7 +687,7 @@ Promise<BotReply> {
 
     // ✅ 차량 스펙(주행거리/연비 등) 직접 응답 — vehicles.json 기반
     {
-      const q = (text ?? '').toLowerCase().replace(/\s+/g, '');
+      const q = rewrittenText.replace(/\s+/g, '');
       const car = (vehicles as any[]).find(v =>
         q.includes(v.id) || q.includes(v.name.replace(/\s+/g,'')) ||
         (v.name.includes('아이오닉') && q.includes('ioniq'))
@@ -668,19 +728,8 @@ Promise<BotReply> {
     }
   }
 
-  // ✅ 모델/용어 유사어 사전 (canonical → variants)
-  const ALIASES: Record<string, string[]> = {
-    "아반떼": ["아반테", "avante", "엘란트라", "elantra"],
-    "아이오닉5": ["아이오닉 5", "ioniq5", "Ioniq 5"],
-    "아이오닉6": ["아이오닉 6", "ioniq6", "Ioniq 6"],
-    "EV6": ["ev 6", "기아 ev6"], // 타사지만 사용자가 섞어 말할 수 있음
-    "코나": ["kona", "코나 EV", "코나 일렉트릭"],
-    "쏘나타": ["소나타", "sonata"],
-    "투싼": ["tucson", "투산"],
-    "팰리세이드": ["펠리세이드", "palisade"],
-    "캐스퍼": ["casper"],
-    "넥쏘": ["nexo"],
-  };
+  // ✅ 모델/용어 유사어 사전 (rewriteQuery와 동일 canonical 기준)
+  const ALIASES: Record<string, string[]> = VARIANTS_CANON;
 
   // 역인덱스(variant → canonical)
   const ALIAS_REVERSE = Object.entries(ALIASES).reduce((m, [canon, vars]) => {
@@ -733,14 +782,14 @@ Promise<BotReply> {
     return null;
   }
 
-  const N = normalizeK(text);
+  const N = normalizeK(rewrittenText);
 
 
-  let { intent, entities } = parseIntent(text);
+  let { intent, entities } = parseIntent(text, rewrittenText);
 
   // ⬇️ 메타 초기화 + 리라이트 여부 기록
   let __meta: Meta = { path: "RAG" };
-  const __rewriteApplied = rewriteQuery(text) !== (text || "").toLowerCase();
+  const __rewriteApplied = rewrittenText !== (text || "").toLowerCase().trim();
 
   // 🔥 [NEW] R3 오버라이드 → Gold 최우선 처리
   try {
@@ -776,7 +825,7 @@ Promise<BotReply> {
         ),
         chips: ["자주 묻는 질문", "처음으로"],
         cards: [],
-        sticky_cta: buildSingleCTA("https://www.hyundai.co.kr/news/newsMain"),
+        sticky_cta: null,
       };
       (reply as any).__meta = {
         path: "Fallback",
@@ -798,6 +847,7 @@ Promise<BotReply> {
         source: "exact-match",
         bypassHighRisk: true,
         intentHint: "faq",
+        noCta: __coreEntityQuery,
         rewriteApplied: rewriteQuery(text) !== (text || "").toLowerCase(),
       });
       if (forced) return forced;
@@ -814,6 +864,7 @@ Promise<BotReply> {
         reason: guardHit.reason,
         bypassHighRisk: true,
         intentHint: "faq",
+        noCta: __coreEntityQuery,
         rewriteApplied: rewriteQuery(text) !== (text || "").toLowerCase(),
       });
       if (forced) return forced;
@@ -1209,7 +1260,7 @@ Promise<BotReply> {
       const alt2 = N.compact !== N.basic ? await retrieveFaq(N.compact, { k: 6 }) : null;
 
       // 간단 병합(중복은 최고 점수 유지) 후 점수 내림차순
-      const pool = [ ...(retr || []), ...(alt1 || []), ...(alt2 || []) ];
+      const pool = [ ...(retr || []), ...(alt0 || []), ...(alt1 || []), ...(alt2 || []) ];
       const seen = new Map<string, any>();
       for (const x of pool) {
         const key = x?.id || x?.url || x?.q || JSON.stringify(x);
@@ -1361,14 +1412,26 @@ Promise<BotReply> {
             messages: cushionMsgs(out),
             chips: ["혜택", "자주 묻는 질문", "처음으로"],
             cards: [],
-            sticky_cta: buildSingleCTA(primaryUrl),
+            sticky_cta: __coreEntityQuery ? null : buildSingleCTA(primaryUrl),
           };
           (reply as any).__meta = __meta;
           return reply;
         }
 
-        // (이하 기존 fail 처리 유지: 로그/recBad/makeFallbackReply 등)
-        // ...
+        recBad();
+        logEvent({ route: "rag", status: "fail", fail_reason: "OTHER", retr_k: retr.length, retr_ms });
+        const out = cleanText(guardOutput(retr.map((r) => r.text).join("\n\n")));
+        const suppressCta = usingOpenDomain || APOLOGY_REGEX.test(out);
+        const primaryUrl = suppressCta ? null : pickPrimaryUrl(retr);
+        __meta.primaryUrl = primaryUrl;
+        const reply: BotReply = {
+          messages: cushionMsgs(out || fallbackMessage()),
+          chips: ["혜택", "자주 묻는 질문", "처음으로"],
+          cards: [],
+          sticky_cta: __coreEntityQuery ? null : buildSingleCTA(primaryUrl),
+        };
+        (reply as any).__meta = { ...__meta, reason: "llm_nonquota_fallback" };
+        return reply;
       }
     }
 
@@ -1400,7 +1463,7 @@ Promise<BotReply> {
       messages: cushionMsgs(out),
       chips: ["혜택", "자주 묻는 질문", "처음으로"],
       cards: [],
-      sticky_cta: buildSingleCTA(primaryUrl),
+      sticky_cta: __coreEntityQuery ? null : buildSingleCTA(primaryUrl),
     };
     (reply as any).__meta = __meta;
     return reply;
